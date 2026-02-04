@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Login</title>
+    <style>
+        body { font-family: Arial; padding: 50px; }
+        input { padding: 10px; margin: 10px; width: 300px; }
+        button { padding: 15px; background: blue; color: white; }
+    </style>
+</head>
+<body>
+    <h1>TEST LOGIN SIMPLE</h1>
+    
+    <input type="text" id="testNis" placeholder="NIS">
+    <input type="password" id="testPass" placeholder="Password">
+    <button onclick="testLogin()">LOGIN</button>
+    
+    <script>
+        function testLogin() {
+            if (document.getElementById('testNis').value === '2024001') {
+                alert('SUCCESS! Opening card...');
+                window.open('card.html', '_blank');
+            } else {
+                alert('Try NIS: 2024001');
+            }
+        }
+    </script>
+</body>
+</html>
