@@ -1,29 +1,23 @@
-// Base URL untuk GitHub Pages
-const BASE_URL = window.location.origin;
-let currentSiswa = null;
+// ==================== KARTU PELAJAR ONLINE - MAIN.JS ====================
 
-// Inisialisasi jsPDF
-const { jsPDF } = window.jspdf;
-
-// Data sekolah (bisa diambil dari settings nanti)
+// Data sekolah
 const sekolahData = {
     nama: "SMP NEGERI 1 PAMARAYAN",
     alamat: "Jl. Pendidikan No. 123, Pamarayan, Kabupaten Serang, Banten 42178",
     telepon: "(0254) 123456",
-    website: "https://riadul54-adm.github.io/kartu-pelajar-smpn1/",
     tahunAjaran: "2024/2025"
 };
 
-// Data siswa dummy untuk demo (nanti akan diambil dari database)
-const demoData = {
+// Data siswa untuk demo
+const demoStudents = {
     "2024001": {
         NIS: "2024001",
         Nama: "ANDI WIJAYA",
         Kelas: "7A",
         JenisKelamin: "L",
         TTL: "Pamarayan, 15 Januari 2012",
-        Alamat: "Jl. Merdeka No. 1, Pamarayan",
-        Foto: "",
+        Alamat: "Jl. Merdeka No. 1",
+        Password: "15012012",
         TahunAjaran: "2024/2025"
     },
     "2024002": {
@@ -32,299 +26,210 @@ const demoData = {
         Kelas: "7B",
         JenisKelamin: "P",
         TTL: "Pamarayan, 20 Maret 2012",
-        Alamat: "Jl. Pendidikan No. 5, Pamarayan",
-        Foto: "",
+        Alamat: "Jl. Pendidikan No. 5",
+        Password: "20032012",
         TahunAjaran: "2024/2025"
     }
 };
 
-// Login siswa
+// ==================== LOGIN FUNCTION ====================
 async function login() {
     const nis = document.getElementById('nis').value.trim();
     const password = document.getElementById('password').value.trim();
     
+    // Validasi input
     if (!nis || !password) {
         alert('Harap isi NIS dan Password');
         return;
     }
     
-    // Validasi format password (DDMMYYYY)
-    if (password.length !== 8 || isNaN(password)) {
-        alert('Password harus 8 digit angka (DDMMYYYY)');
-        return;
-    }
+    // Tampilkan loading
+    const loginBtn = document.querySelector('.btn-login');
+    loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> MEMPROSES...';
+    loginBtn.disabled = true;
     
     try {
-        // Simulasi login - nanti akan diganti dengan API
-        showLoading();
+        // Cari siswa
+        let siswa = null;
         
-        // Check demo data
-        if (demoData[nis] && password === nis.slice(4) + "2012") {
-            // Password benar (untuk demo: 15012012 untuk 2024001)
-            currentSiswa = demoData[nis];
-            
-            // Generate dan download kartu
-            await generateKartuPelajar(currentSiswa);
-            
-            // Simpan log download
-            saveDownloadLog(nis);
-            
-        } else {
-            // Coba cek localStorage (data dari admin panel)
-            const siswaData = JSON.parse(localStorage.getItem('siswaData') || '[]');
-            const siswa = siswaData.find(s => s.NIS === nis && s.Password === password);
-            
-            if (siswa) {
-                currentSiswa = siswa;
-                await generateKartuPelajar(currentSiswa);
-                saveDownloadLog(nis);
-            } else {
-                throw new Error('NIS atau password salah');
+        // Cek di data demo dulu
+        if (demoStudents[nis] && demoStudents[nis].Password === password) {
+            siswa = demoStudents[nis];
+        } 
+        // Cek di localStorage (data dari admin)
+        else {
+            const storedData = localStorage.getItem('siswaData');
+            if (storedData) {
+                const allStudents = JSON.parse(storedData);
+                const found = allStudents.find(s => s.NIS === nis && s.Password === password);
+                if (found) siswa = found;
             }
         }
         
+        if (siswa) {
+            // LOGIN BERHASIL - Generate kartu
+            alert(`✅ LOGIN BERHASIL!\n\nSelamat datang ${siswa.Nama}\nMembuat kartu pelajar...`);
+            
+            // Generate dan download PDF
+            await generatePDF(siswa);
+            
+            // Simpan log
+            saveDownloadLog(nis);
+            
+        } else {
+            alert('❌ LOGIN GAGAL\nNIS atau Password salah');
+        }
+        
     } catch (error) {
-        alert('Login gagal: ' + error.message);
+        console.error('Error:', error);
+        alert('Terjadi error: ' + error.message);
     } finally {
-        hideLoading();
+        // Reset button
+        loginBtn.innerHTML = '<i class="fas fa-download"></i> LOGIN & DOWNLOAD KARTU';
+        loginBtn.disabled = false;
     }
 }
 
-// Generate kartu pelajar PDF
-function generateKartuPelajar(siswa) {
-    return new Promise((resolve) => {
-        // Buat PDF baru - Ukuran kartu (86mm x 54mm)
-        const doc = new jsPDF({
-            orientation: 'landscape',
-            unit: 'mm',
-            format: [86, 54]
-        });
-        
-        // ============= BACKGROUND & DESIGN =============
-        
-        // Background utama
-        doc.setFillColor(240, 240, 240);
-        doc.rect(0, 0, 86, 54, 'F');
-        
-        // Header biru
-        doc.setFillColor(41, 128, 185); // Biru SMP
-        doc.rect(0, 0, 86, 12, 'F');
-        
-        // ============= LOGO & JUDUL =============
-        
-        // Judul KARTU PELAJAR
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('KARTU PELAJAR', 43, 7, { align: 'center' });
-        
-        // Nama Sekolah
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.text(sekolahData.nama, 43, 17, { align: 'center' });
-        
-        // Alamat Sekolah
-        doc.setFontSize(6);
-        doc.setFont('helvetica', 'normal');
-        doc.text(sekolahData.alamat, 43, 20, { align: 'center' });
-        
-        // Tahun Ajaran
-        doc.text(`TAHUN AJARAN: ${siswa.TahunAjaran || sekolahData.tahunAjaran}`, 43, 23, { align: 'center' });
-        
-        // ============= FOTO SISWA =============
-        
-        // Kotak foto (jika ada foto)
-        doc.setDrawColor(150, 150, 150);
-        doc.setLineWidth(0.5);
-        doc.rect(5, 26, 20, 25);
-        
-        // Text placeholder foto
-        doc.setTextColor(100, 100, 100);
-        doc.setFontSize(6);
-        doc.text('FOTO', 15, 35, { align: 'center' });
-        doc.text('3x4', 15, 38, { align: 'center' });
-        
-        // ============= DATA SISWA =============
-        
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        
-        let yPos = 28;
-        const lineHeight = 4;
-        
-        // NIS
-        doc.setFont('helvetica', 'bold');
-        doc.text('NIS:', 27, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(siswa.NIS, 35, yPos);
-        yPos += lineHeight;
-        
-        // NAMA
-        doc.setFont('helvetica', 'bold');
-        doc.text('NAMA:', 27, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(siswa.Nama, 38, yPos);
-        yPos += lineHeight;
-        
-        // KELAS
-        doc.setFont('helvetica', 'bold');
-        doc.text('KELAS:', 27, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(siswa.Kelas, 38, yPos);
-        yPos += lineHeight;
-        
-        // JENIS KELAMIN
-        doc.setFont('helvetica', 'bold');
-        doc.text('JK:', 27, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(siswa.JenisKelamin === 'L' ? 'LAKI-LAKI' : 'PEREMPUAN', 35, yPos);
-        yPos += lineHeight;
-        
-        // TTL
-        doc.setFont('helvetica', 'bold');
-        doc.text('TTL:', 27, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(siswa.TTL, 35, yPos);
-        yPos += lineHeight;
-        
-        // ALAMAT
-        doc.setFont('helvetica', 'bold');
-        doc.text('ALAMAT:', 27, yPos);
-        doc.setFont('helvetica', 'normal');
-        
-        // Potong alamat jika terlalu panjang
-        const alamat = siswa.Alamat.length > 30 ? siswa.Alamat.substring(0, 30) + '...' : siswa.Alamat;
-        doc.text(alamat, 40, yPos);
-        
-        // ============= QR CODE AREA =============
-        
-        // Kotak QR Code
-        doc.setDrawColor(41, 128, 185);
-        doc.setLineWidth(0.5);
-        doc.rect(60, 26, 20, 20);
-        
-        // Text QR Code
-        doc.setTextColor(41, 128, 185);
-        doc.setFontSize(6);
-        doc.text('SCAN UNTUK', 70, 48, { align: 'center' });
-        doc.text('VERIFIKASI', 70, 51, { align: 'center' });
-        
-        // ============= FOOTER & INFO =============
-        
-        // Garis pemisah
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.2);
-        doc.line(5, 52, 81, 52);
-        
-        // Info penting
-        doc.setTextColor(100, 100, 100);
-        doc.setFontSize(5);
-        doc.text('Kartu ini berlaku selama menjadi siswa di ' + sekolahData.nama, 43, 54, { align: 'center' });
-        
-        // ============= SAVE PDF =============
-        
-        // Generate nama file
-        const fileName = `KARTU_PELAJAR_${siswa.NIS}_${siswa.Nama.replace(/\s+/g, '_')}.pdf`;
-        
-        // Save PDF
-        doc.save(fileName);
-        
-        // Tampilkan pesan sukses
-        setTimeout(() => {
-            alert(`✅ KARTU PELAJAR BERHASIL DI-GENERATE!\n\nFile: ${fileName}\n\nSilakan cetak dengan:\n• Ukuran: Kartu (86x54mm)\n• Kertas: Photo paper atau kartu\n• Warna: Full color`);
-            resolve();
-        }, 500);
+// ==================== GENERATE PDF FUNCTION ====================
+function generatePDF(siswa) {
+    return new Promise((resolve, reject) => {
+        try {
+            // Buat PDF dengan jsPDF
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: [86, 54] // Ukuran kartu
+            });
+            
+            // ===== DESIGN KARTU =====
+            
+            // Background
+            doc.setFillColor(245, 245, 245);
+            doc.rect(0, 0, 86, 54, 'F');
+            
+            // Header biru
+            doc.setFillColor(41, 128, 185);
+            doc.rect(0, 0, 86, 12, 'F');
+            
+            // Judul
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('KARTU PELAJAR', 43, 7, { align: 'center' });
+            
+            // Nama sekolah
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(8);
+            doc.text(sekolahData.nama, 43, 17, { align: 'center' });
+            
+            // Alamat sekolah
+            doc.setFontSize(6);
+            doc.text(sekolahData.alamat, 43, 21, { align: 'center' });
+            
+            // Garis pemisah
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(5, 24, 81, 24);
+            
+            // ===== DATA SISWA =====
+            
+            let yPos = 28;
+            
+            // NIS
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.text('NIS:', 10, yPos);
+            doc.setFont('helvetica', 'normal');
+            doc.text(siswa.NIS, 25, yPos);
+            
+            // Nama
+            yPos += 6;
+            doc.setFont('helvetica', 'bold');
+            doc.text('NAMA:', 10, yPos);
+            doc.setFont('helvetica', 'normal');
+            doc.text(siswa.Nama, 25, yPos);
+            
+            // Kelas
+            yPos += 6;
+            doc.setFont('helvetica', 'bold');
+            doc.text('KELAS:', 10, yPos);
+            doc.setFont('helvetica', 'normal');
+            doc.text(siswa.Kelas, 25, yPos);
+            
+            // TTL
+            yPos += 6;
+            doc.setFont('helvetica', 'bold');
+            doc.text('TTL:', 10, yPos);
+            doc.setFont('helvetica', 'normal');
+            doc.text(siswa.TTL, 25, yPos);
+            
+            // ===== FOTO & QR AREA =====
+            
+            // Kotak foto
+            doc.setDrawColor(150, 150, 150);
+            doc.rect(55, 28, 25, 30);
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(7);
+            doc.text('FOTO', 67.5, 40, { align: 'center' });
+            doc.text('3x4 cm', 67.5, 44, { align: 'center' });
+            
+            // QR Code area
+            doc.setDrawColor(41, 128, 185);
+            doc.rect(55, 45, 25, 8);
+            doc.setTextColor(41, 128, 185);
+            doc.setFontSize(5);
+            doc.text('SCAN QR CODE', 67.5, 48, { align: 'center' });
+            doc.text('UNTUK VERIFIKASI', 67.5, 51, { align: 'center' });
+            
+            // ===== FOOTER =====
+            
+            doc.setTextColor(100, 100, 100);
+            doc.setFontSize(5);
+            doc.text(`Tahun Ajaran: ${siswa.TahunAjaran}`, 43, 52, { align: 'center' });
+            
+            // ===== SAVE PDF =====
+            
+            const fileName = `KARTU_PELAJAR_${siswa.NIS}_${siswa.Nama.replace(/\s/g, '_')}.pdf`;
+            doc.save(fileName);
+            
+            // Selesai
+            setTimeout(() => {
+                alert(`📄 KARTU BERHASIL DI-DOWNLOAD!\n\nFile: ${fileName}\n\nInstruksi cetak:\n1. Print pada kertas foto/kartu\n2. Ukuran: Kartu (86x54mm)\n3. Laminating untuk keawetan`);
+                resolve();
+            }, 1000);
+            
+        } catch (error) {
+            console.error('PDF Error:', error);
+            
+            // Fallback: Tampilkan data saja
+            alert(`Login berhasil tetapi PDF gagal dibuat.\n\nDATA SISWA:\nNIS: ${siswa.NIS}\nNama: ${siswa.Nama}\nKelas: ${siswa.Kelas}\n\nSilakan hubungi admin untuk kartu fisik.`);
+            
+            reject(error);
+        }
     });
 }
 
-// Generate kartu sederhana (versi alternatif)
-function generateSimpleCard(siswa) {
-    const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-    });
-    
-    // Header
-    doc.setFillColor(41, 128, 185);
-    doc.rect(0, 0, 210, 40, 'F');
-    
-    // Logo/title
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text('KARTU PELAJAR', 105, 20, { align: 'center' });
-    
-    doc.setFontSize(14);
-    doc.text(sekolahData.nama, 105, 30, { align: 'center' });
-    
-    // Student photo area
-    doc.setDrawColor(0, 0, 0);
-    doc.rect(20, 60, 40, 50);
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(10);
-    doc.text('FOTO', 40, 85, { align: 'center' });
-    doc.text('3x4 cm', 40, 90, { align: 'center' });
-    
-    // Student data
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
-    doc.text(`NIS: ${siswa.NIS}`, 80, 60);
-    doc.text(`Nama: ${siswa.Nama}`, 80, 70);
-    doc.text(`Kelas: ${siswa.Kelas}`, 80, 80);
-    doc.text(`TTL: ${siswa.TTL}`, 80, 90);
-    doc.text(`Alamat: ${siswa.Alamat.substring(0, 50)}`, 80, 100);
-    
-    // QR Code placeholder
-    doc.setDrawColor(41, 128, 185);
-    doc.rect(150, 60, 40, 40);
-    doc.setTextColor(41, 128, 185);
-    doc.setFontSize(10);
-    doc.text('QR CODE', 170, 85, { align: 'center' });
-    doc.text('VERIFIKASI', 170, 90, { align: 'center' });
-    
-    // Footer
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(10);
-    doc.text(`Tahun Ajaran: ${siswa.TahunAjaran}`, 105, 150, { align: 'center' });
-    doc.text('Kartu ini sah dan berlaku selama menjadi siswa', 105, 160, { align: 'center' });
-    
-    doc.save(`kartu-pelajar-${siswa.NIS}.pdf`);
-}
-
-// Simpan log download
+// ==================== HELPER FUNCTIONS ====================
 function saveDownloadLog(nis) {
-    let logs = JSON.parse(localStorage.getItem('downloadLogs') || '[]');
-    logs.push({
-        nis: nis,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent
-    });
-    localStorage.setItem('downloadLogs', JSON.stringify(logs));
-    
-    // Update counter di admin panel
-    let count = parseInt(localStorage.getItem('totalDownload') || '0');
-    localStorage.setItem('totalDownload', (count + 1).toString());
+    try {
+        let logs = JSON.parse(localStorage.getItem('downloadLogs') || '[]');
+        logs.push({
+            nis: nis,
+            date: new Date().toLocaleDateString('id-ID'),
+            time: new Date().toLocaleTimeString('id-ID')
+        });
+        localStorage.setItem('downloadLogs', JSON.stringify(logs));
+        
+        // Update counter
+        let count = parseInt(localStorage.getItem('totalDownloads') || '0');
+        localStorage.setItem('totalDownloads', (count + 1).toString());
+    } catch (e) {
+        console.log('Gagal simpan log:', e);
+    }
 }
 
-// Loading functions
-function showLoading() {
-    document.getElementById('nis').disabled = true;
-    document.getElementById('password').disabled = true;
-    document.querySelector('.btn-login').innerHTML = '<i class="fas fa-spinner fa-spin"></i> MEMBUAT KARTU...';
-    document.querySelector('.btn-login').disabled = true;
-}
-
-function hideLoading() {
-    document.getElementById('nis').disabled = false;
-    document.getElementById('password').disabled = false;
-    document.querySelector('.btn-login').innerHTML = '<i class="fas fa-download"></i> LOGIN & DOWNLOAD KARTU';
-    document.querySelector('.btn-login').disabled = false;
-}
-
-// Event listener untuk Enter key
+// ==================== EVENT LISTENERS ====================
 document.addEventListener('DOMContentLoaded', function() {
     // Enter key support
     document.getElementById('password').addEventListener('keypress', function(e) {
@@ -333,14 +238,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Auto-focus pada NIS field
+    // Auto-focus
     document.getElementById('nis').focus();
-    
-    // Check jika ada parameter NIS di URL (untuk testing)
-    const urlParams = new URLSearchParams(window.location.search);
-    const nisParam = urlParams.get('nis');
-    if (nisParam) {
-        document.getElementById('nis').value = nisParam;
-        document.getElementById('password').focus();
-    }
 });
